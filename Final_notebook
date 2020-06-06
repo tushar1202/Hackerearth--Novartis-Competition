@@ -1,0 +1,1522 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Hackerearth--Novartis-Competition\n",
+    "In this competition hosted on Hackerearth website Novartis is challenging us to predict if the server will be hacked or not. We are given data with columns :\n",
+    "\n",
+    "1. Incident Id : Unique identifier of the incident log\n",
+    "2. Date : Date of incident occurence\n",
+    "3. X_1 - X_15 : 15 anonymized columns having logging parameters\n",
+    "4. Multiple_offense : Target column : 1 for a hack and 0 for no"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Importing required libraries\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "\n",
+    "# Plotting libraries\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "# Stats\n",
+    "from scipy import stats\n",
+    "from scipy.stats import skew, norm\n",
+    "from scipy.special import boxcox1p\n",
+    "from scipy.stats import boxcox_normmax\n",
+    "\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Importing all the given datasets to pandas dataframes\n",
+    "train = pd.read_csv(\"train.csv\")\n",
+    "test = pd.read_csv(\"test.csv\")\n",
+    "\n",
+    "# Parsing the date column as 'date' datatype in both training and test data\n",
+    "train['DATE'] = pd.to_datetime(train['DATE'])\n",
+    "test['DATE'] = pd.to_datetime(test['DATE'])\n",
+    "\n",
+    "sub = pd.read_csv(\"sample_submission.csv\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Exploratory data analysis"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>INCIDENT_ID</th>\n",
+       "      <th>DATE</th>\n",
+       "      <th>X_1</th>\n",
+       "      <th>X_2</th>\n",
+       "      <th>X_3</th>\n",
+       "      <th>X_4</th>\n",
+       "      <th>X_5</th>\n",
+       "      <th>X_6</th>\n",
+       "      <th>X_7</th>\n",
+       "      <th>X_8</th>\n",
+       "      <th>X_9</th>\n",
+       "      <th>X_10</th>\n",
+       "      <th>X_11</th>\n",
+       "      <th>X_12</th>\n",
+       "      <th>X_13</th>\n",
+       "      <th>X_14</th>\n",
+       "      <th>X_15</th>\n",
+       "      <th>MULTIPLE_OFFENSE</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>0</th>\n",
+       "      <td>CR_102659</td>\n",
+       "      <td>2004-07-04</td>\n",
+       "      <td>0</td>\n",
+       "      <td>36</td>\n",
+       "      <td>34</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>5</td>\n",
+       "      <td>6</td>\n",
+       "      <td>1</td>\n",
+       "      <td>6</td>\n",
+       "      <td>1</td>\n",
+       "      <td>174</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>92</td>\n",
+       "      <td>29</td>\n",
+       "      <td>36</td>\n",
+       "      <td>0</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>1</th>\n",
+       "      <td>CR_189752</td>\n",
+       "      <td>2017-07-18</td>\n",
+       "      <td>1</td>\n",
+       "      <td>37</td>\n",
+       "      <td>37</td>\n",
+       "      <td>0</td>\n",
+       "      <td>0</td>\n",
+       "      <td>11</td>\n",
+       "      <td>17</td>\n",
+       "      <td>1</td>\n",
+       "      <td>6</td>\n",
+       "      <td>1</td>\n",
+       "      <td>236</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>103</td>\n",
+       "      <td>142</td>\n",
+       "      <td>34</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>2</th>\n",
+       "      <td>CR_184637</td>\n",
+       "      <td>2017-03-15</td>\n",
+       "      <td>0</td>\n",
+       "      <td>3</td>\n",
+       "      <td>2</td>\n",
+       "      <td>3</td>\n",
+       "      <td>5</td>\n",
+       "      <td>1</td>\n",
+       "      <td>0</td>\n",
+       "      <td>2</td>\n",
+       "      <td>3</td>\n",
+       "      <td>1</td>\n",
+       "      <td>174</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>110</td>\n",
+       "      <td>93</td>\n",
+       "      <td>34</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>3</th>\n",
+       "      <td>CR_139071</td>\n",
+       "      <td>2009-02-13</td>\n",
+       "      <td>0</td>\n",
+       "      <td>33</td>\n",
+       "      <td>32</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>7</td>\n",
+       "      <td>1</td>\n",
+       "      <td>1</td>\n",
+       "      <td>6</td>\n",
+       "      <td>1</td>\n",
+       "      <td>249</td>\n",
+       "      <td>1.0</td>\n",
+       "      <td>72</td>\n",
+       "      <td>29</td>\n",
+       "      <td>34</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>4</th>\n",
+       "      <td>CR_109335</td>\n",
+       "      <td>2005-04-13</td>\n",
+       "      <td>0</td>\n",
+       "      <td>33</td>\n",
+       "      <td>32</td>\n",
+       "      <td>2</td>\n",
+       "      <td>1</td>\n",
+       "      <td>8</td>\n",
+       "      <td>3</td>\n",
+       "      <td>0</td>\n",
+       "      <td>5</td>\n",
+       "      <td>1</td>\n",
+       "      <td>174</td>\n",
+       "      <td>0.0</td>\n",
+       "      <td>112</td>\n",
+       "      <td>29</td>\n",
+       "      <td>43</td>\n",
+       "      <td>1</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "  INCIDENT_ID       DATE  X_1  X_2  X_3  X_4  X_5  X_6  X_7  X_8  X_9  X_10  \\\n",
+       "0   CR_102659 2004-07-04    0   36   34    2    1    5    6    1    6     1   \n",
+       "1   CR_189752 2017-07-18    1   37   37    0    0   11   17    1    6     1   \n",
+       "2   CR_184637 2017-03-15    0    3    2    3    5    1    0    2    3     1   \n",
+       "3   CR_139071 2009-02-13    0   33   32    2    1    7    1    1    6     1   \n",
+       "4   CR_109335 2005-04-13    0   33   32    2    1    8    3    0    5     1   \n",
+       "\n",
+       "   X_11  X_12  X_13  X_14  X_15  MULTIPLE_OFFENSE  \n",
+       "0   174   1.0    92    29    36                 0  \n",
+       "1   236   1.0   103   142    34                 1  \n",
+       "2   174   1.0   110    93    34                 1  \n",
+       "3   249   1.0    72    29    34                 1  \n",
+       "4   174   0.0   112    29    43                 1  "
+      ]
+     },
+     "execution_count": 3,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Checking the training data\n",
+    "train.head()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "From the initial look we can see that all the encrypted values are numerical values, we may need to further check if some columns are categorical and are encoded to numerical values.<br>\n",
+    "\n",
+    "Also only variable X_12 is float whereas all other features are integers"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [
+       "<div>\n",
+       "<style scoped>\n",
+       "    .dataframe tbody tr th:only-of-type {\n",
+       "        vertical-align: middle;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe tbody tr th {\n",
+       "        vertical-align: top;\n",
+       "    }\n",
+       "\n",
+       "    .dataframe thead th {\n",
+       "        text-align: right;\n",
+       "    }\n",
+       "</style>\n",
+       "<table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       "    <tr style=\"text-align: right;\">\n",
+       "      <th></th>\n",
+       "      <th>X_1</th>\n",
+       "      <th>X_2</th>\n",
+       "      <th>X_3</th>\n",
+       "      <th>X_4</th>\n",
+       "      <th>X_5</th>\n",
+       "      <th>X_6</th>\n",
+       "      <th>X_7</th>\n",
+       "      <th>X_8</th>\n",
+       "      <th>X_9</th>\n",
+       "      <th>X_10</th>\n",
+       "      <th>X_11</th>\n",
+       "      <th>X_12</th>\n",
+       "      <th>X_13</th>\n",
+       "      <th>X_14</th>\n",
+       "      <th>X_15</th>\n",
+       "      <th>MULTIPLE_OFFENSE</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <th>count</th>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23674.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "      <td>23856.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>mean</th>\n",
+       "      <td>0.483778</td>\n",
+       "      <td>24.791206</td>\n",
+       "      <td>24.637450</td>\n",
+       "      <td>4.276744</td>\n",
+       "      <td>2.455609</td>\n",
+       "      <td>6.154175</td>\n",
+       "      <td>4.876509</td>\n",
+       "      <td>0.972460</td>\n",
+       "      <td>4.924128</td>\n",
+       "      <td>1.244802</td>\n",
+       "      <td>206.954519</td>\n",
+       "      <td>0.974064</td>\n",
+       "      <td>85.237383</td>\n",
+       "      <td>72.674296</td>\n",
+       "      <td>33.464747</td>\n",
+       "      <td>0.955231</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>std</th>\n",
+       "      <td>1.439738</td>\n",
+       "      <td>15.240231</td>\n",
+       "      <td>15.135093</td>\n",
+       "      <td>2.944672</td>\n",
+       "      <td>1.963095</td>\n",
+       "      <td>4.471756</td>\n",
+       "      <td>3.881931</td>\n",
+       "      <td>1.453144</td>\n",
+       "      <td>1.362625</td>\n",
+       "      <td>1.119301</td>\n",
+       "      <td>93.033348</td>\n",
+       "      <td>1.167725</td>\n",
+       "      <td>27.597226</td>\n",
+       "      <td>43.297320</td>\n",
+       "      <td>8.386834</td>\n",
+       "      <td>0.206800</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>min</th>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>25%</th>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>7.000000</td>\n",
+       "      <td>8.000000</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>3.000000</td>\n",
+       "      <td>2.000000</td>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>174.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>72.000000</td>\n",
+       "      <td>29.000000</td>\n",
+       "      <td>34.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>50%</th>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>24.000000</td>\n",
+       "      <td>24.000000</td>\n",
+       "      <td>4.000000</td>\n",
+       "      <td>3.000000</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>4.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>249.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>98.000000</td>\n",
+       "      <td>62.000000</td>\n",
+       "      <td>34.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>75%</th>\n",
+       "      <td>0.000000</td>\n",
+       "      <td>36.000000</td>\n",
+       "      <td>35.000000</td>\n",
+       "      <td>6.000000</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>8.000000</td>\n",
+       "      <td>7.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>6.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>249.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "      <td>103.000000</td>\n",
+       "      <td>107.000000</td>\n",
+       "      <td>34.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <th>max</th>\n",
+       "      <td>7.000000</td>\n",
+       "      <td>52.000000</td>\n",
+       "      <td>52.000000</td>\n",
+       "      <td>10.000000</td>\n",
+       "      <td>5.000000</td>\n",
+       "      <td>19.000000</td>\n",
+       "      <td>18.000000</td>\n",
+       "      <td>99.000000</td>\n",
+       "      <td>6.000000</td>\n",
+       "      <td>90.000000</td>\n",
+       "      <td>332.000000</td>\n",
+       "      <td>90.000000</td>\n",
+       "      <td>116.000000</td>\n",
+       "      <td>142.000000</td>\n",
+       "      <td>50.000000</td>\n",
+       "      <td>1.000000</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table>\n",
+       "</div>"
+      ],
+      "text/plain": [
+       "                X_1           X_2           X_3           X_4           X_5  \\\n",
+       "count  23856.000000  23856.000000  23856.000000  23856.000000  23856.000000   \n",
+       "mean       0.483778     24.791206     24.637450      4.276744      2.455609   \n",
+       "std        1.439738     15.240231     15.135093      2.944672      1.963095   \n",
+       "min        0.000000      0.000000      0.000000      0.000000      0.000000   \n",
+       "25%        0.000000      7.000000      8.000000      2.000000      1.000000   \n",
+       "50%        0.000000     24.000000     24.000000      4.000000      3.000000   \n",
+       "75%        0.000000     36.000000     35.000000      6.000000      5.000000   \n",
+       "max        7.000000     52.000000     52.000000     10.000000      5.000000   \n",
+       "\n",
+       "                X_6           X_7           X_8           X_9          X_10  \\\n",
+       "count  23856.000000  23856.000000  23856.000000  23856.000000  23856.000000   \n",
+       "mean       6.154175      4.876509      0.972460      4.924128      1.244802   \n",
+       "std        4.471756      3.881931      1.453144      1.362625      1.119301   \n",
+       "min        1.000000      0.000000      0.000000      0.000000      1.000000   \n",
+       "25%        3.000000      2.000000      0.000000      5.000000      1.000000   \n",
+       "50%        5.000000      4.000000      1.000000      5.000000      1.000000   \n",
+       "75%        8.000000      7.000000      1.000000      6.000000      1.000000   \n",
+       "max       19.000000     18.000000     99.000000      6.000000     90.000000   \n",
+       "\n",
+       "               X_11          X_12          X_13          X_14          X_15  \\\n",
+       "count  23856.000000  23674.000000  23856.000000  23856.000000  23856.000000   \n",
+       "mean     206.954519      0.974064     85.237383     72.674296     33.464747   \n",
+       "std       93.033348      1.167725     27.597226     43.297320      8.386834   \n",
+       "min        0.000000      0.000000      0.000000      0.000000      0.000000   \n",
+       "25%      174.000000      1.000000     72.000000     29.000000     34.000000   \n",
+       "50%      249.000000      1.000000     98.000000     62.000000     34.000000   \n",
+       "75%      249.000000      1.000000    103.000000    107.000000     34.000000   \n",
+       "max      332.000000     90.000000    116.000000    142.000000     50.000000   \n",
+       "\n",
+       "       MULTIPLE_OFFENSE  \n",
+       "count      23856.000000  \n",
+       "mean           0.955231  \n",
+       "std            0.206800  \n",
+       "min            0.000000  \n",
+       "25%            1.000000  \n",
+       "50%            1.000000  \n",
+       "75%            1.000000  \n",
+       "max            1.000000  "
+      ]
+     },
+     "execution_count": 4,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train.describe()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking the null values in the data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "X_12                182\n",
+       "MULTIPLE_OFFENSE      0\n",
+       "X_6                   0\n",
+       "DATE                  0\n",
+       "X_1                   0\n",
+       "X_2                   0\n",
+       "X_3                   0\n",
+       "X_4                   0\n",
+       "X_5                   0\n",
+       "X_7                   0\n",
+       "X_15                  0\n",
+       "X_8                   0\n",
+       "X_9                   0\n",
+       "X_10                  0\n",
+       "X_11                  0\n",
+       "X_13                  0\n",
+       "X_14                  0\n",
+       "INCIDENT_ID           0\n",
+       "dtype: int64"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train.isna().sum().sort_values(ascending = False)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Variable X_12 is the only feature having null values present in the data, lets check the values in X_12 variable"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "1.0     15674\n",
+       "0.0      5171\n",
+       "2.0      2039\n",
+       "3.0       476\n",
+       "4.0       176\n",
+       "5.0        59\n",
+       "6.0        36\n",
+       "8.0         9\n",
+       "10.0        7\n",
+       "9.0         6\n",
+       "7.0         4\n",
+       "11.0        4\n",
+       "15.0        2\n",
+       "20.0        2\n",
+       "17.0        1\n",
+       "58.0        1\n",
+       "50.0        1\n",
+       "40.0        1\n",
+       "16.0        1\n",
+       "90.0        1\n",
+       "12.0        1\n",
+       "30.0        1\n",
+       "14.0        1\n",
+       "Name: X_12, dtype: int64"
+      ]
+     },
+     "execution_count": 6,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train['X_12'].value_counts()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The data in variable X_12 seems to be skewed hence to fill the null values in a skewed distribution is done by either filling the null values with median or mode.\n",
+    "\n",
+    "I will be filling the null values with the mode value i.e. 1\n",
+    "\n",
+    "Also all the values are having only 0 after the decimal, hence this variable can be converted to integer column without any precision or data loss"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the null values with 1\n",
+    "train = train.fillna(1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Changing the data type of X_12 variable from Float to Integer for saving memmory and computation\n",
+    "train['X_12'] = train['X_12'].astype(int)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "MULTIPLE_OFFENSE    0\n",
+       "dtype: int64"
+      ]
+     },
+     "execution_count": 9,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Checking is any null value is pending to be treated in the dataset\n",
+    "train.isna().sum().sort_values(ascending = False).head(1)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking the Correlation between all the features and also features with the target value"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 864x720 with 2 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "#correlation matrix\n",
+    "corrmat = train.corr()\n",
+    "f, ax = plt.subplots(figsize=(12, 10))\n",
+    "sns.heatmap(corrmat, vmax=.8,cmap=\"Blues\", square=True);"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Correlation value for some combinations such as : \n",
+    "1. X_2 and X_3\n",
+    "2. X_6 and X_7\n",
+    "3. X_10 and X_12\n",
+    "\n",
+    "Hence it is much better to drop such columns as issue of multicollinearity may not let our predicting model to reach its full potential"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [
+    {
+     "ename": "KeyError",
+     "evalue": "\"['X_3' 'X_6' 'X_12'] not found in axis\"",
+     "output_type": "error",
+     "traceback": [
+      "\u001b[1;31m---------------------------------------------------------------------------\u001b[0m",
+      "\u001b[1;31mKeyError\u001b[0m                                  Traceback (most recent call last)",
+      "\u001b[1;32m<ipython-input-46-6c922e5a86a5>\u001b[0m in \u001b[0;36m<module>\u001b[1;34m\u001b[0m\n\u001b[0;32m      1\u001b[0m \u001b[1;31m# Dropping the collumns with very high correlation value\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[1;32m----> 2\u001b[1;33m \u001b[0mtrain\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mdrop\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;33m[\u001b[0m\u001b[1;34m'X_3'\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;34m'X_6'\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;34m'X_12'\u001b[0m\u001b[1;33m]\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0maxis\u001b[0m \u001b[1;33m=\u001b[0m \u001b[1;36m1\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0minplace\u001b[0m \u001b[1;33m=\u001b[0m \u001b[1;32mTrue\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0m\u001b[0;32m      3\u001b[0m \u001b[0mtest\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mdrop\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;33m[\u001b[0m\u001b[1;34m'X_3'\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;34m'X_6'\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;34m'X_12'\u001b[0m\u001b[1;33m]\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0maxis\u001b[0m \u001b[1;33m=\u001b[0m \u001b[1;36m1\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0minplace\u001b[0m \u001b[1;33m=\u001b[0m \u001b[1;32mTrue\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n",
+      "\u001b[1;32mC:\\Anaconda3\\lib\\site-packages\\pandas\\core\\frame.py\u001b[0m in \u001b[0;36mdrop\u001b[1;34m(self, labels, axis, index, columns, level, inplace, errors)\u001b[0m\n\u001b[0;32m   3995\u001b[0m             \u001b[0mlevel\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0mlevel\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   3996\u001b[0m             \u001b[0minplace\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0minplace\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[1;32m-> 3997\u001b[1;33m             \u001b[0merrors\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0merrors\u001b[0m\u001b[1;33m,\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0m\u001b[0;32m   3998\u001b[0m         )\n\u001b[0;32m   3999\u001b[0m \u001b[1;33m\u001b[0m\u001b[0m\n",
+      "\u001b[1;32mC:\\Anaconda3\\lib\\site-packages\\pandas\\core\\generic.py\u001b[0m in \u001b[0;36mdrop\u001b[1;34m(self, labels, axis, index, columns, level, inplace, errors)\u001b[0m\n\u001b[0;32m   3934\u001b[0m         \u001b[1;32mfor\u001b[0m \u001b[0maxis\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0mlabels\u001b[0m \u001b[1;32min\u001b[0m \u001b[0maxes\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mitems\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   3935\u001b[0m             \u001b[1;32mif\u001b[0m \u001b[0mlabels\u001b[0m \u001b[1;32mis\u001b[0m \u001b[1;32mnot\u001b[0m \u001b[1;32mNone\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[1;32m-> 3936\u001b[1;33m                 \u001b[0mobj\u001b[0m \u001b[1;33m=\u001b[0m \u001b[0mobj\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0m_drop_axis\u001b[0m\u001b[1;33m(\u001b[0m\u001b[0mlabels\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0maxis\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0mlevel\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0mlevel\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0merrors\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0merrors\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0m\u001b[0;32m   3937\u001b[0m \u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   3938\u001b[0m         \u001b[1;32mif\u001b[0m \u001b[0minplace\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n",
+      "\u001b[1;32mC:\\Anaconda3\\lib\\site-packages\\pandas\\core\\generic.py\u001b[0m in \u001b[0;36m_drop_axis\u001b[1;34m(self, labels, axis, level, errors)\u001b[0m\n\u001b[0;32m   3968\u001b[0m                 \u001b[0mnew_axis\u001b[0m \u001b[1;33m=\u001b[0m \u001b[0maxis\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mdrop\u001b[0m\u001b[1;33m(\u001b[0m\u001b[0mlabels\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0mlevel\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0mlevel\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0merrors\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0merrors\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   3969\u001b[0m             \u001b[1;32melse\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[1;32m-> 3970\u001b[1;33m                 \u001b[0mnew_axis\u001b[0m \u001b[1;33m=\u001b[0m \u001b[0maxis\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mdrop\u001b[0m\u001b[1;33m(\u001b[0m\u001b[0mlabels\u001b[0m\u001b[1;33m,\u001b[0m \u001b[0merrors\u001b[0m\u001b[1;33m=\u001b[0m\u001b[0merrors\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0m\u001b[0;32m   3971\u001b[0m             \u001b[0mresult\u001b[0m \u001b[1;33m=\u001b[0m \u001b[0mself\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mreindex\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;33m**\u001b[0m\u001b[1;33m{\u001b[0m\u001b[0maxis_name\u001b[0m\u001b[1;33m:\u001b[0m \u001b[0mnew_axis\u001b[0m\u001b[1;33m}\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   3972\u001b[0m \u001b[1;33m\u001b[0m\u001b[0m\n",
+      "\u001b[1;32mC:\\Anaconda3\\lib\\site-packages\\pandas\\core\\indexes\\base.py\u001b[0m in \u001b[0;36mdrop\u001b[1;34m(self, labels, errors)\u001b[0m\n\u001b[0;32m   5016\u001b[0m         \u001b[1;32mif\u001b[0m \u001b[0mmask\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0many\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   5017\u001b[0m             \u001b[1;32mif\u001b[0m \u001b[0merrors\u001b[0m \u001b[1;33m!=\u001b[0m \u001b[1;34m\"ignore\"\u001b[0m\u001b[1;33m:\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[1;32m-> 5018\u001b[1;33m                 \u001b[1;32mraise\u001b[0m \u001b[0mKeyError\u001b[0m\u001b[1;33m(\u001b[0m\u001b[1;34mf\"{labels[mask]} not found in axis\"\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0m\u001b[0;32m   5019\u001b[0m             \u001b[0mindexer\u001b[0m \u001b[1;33m=\u001b[0m \u001b[0mindexer\u001b[0m\u001b[1;33m[\u001b[0m\u001b[1;33m~\u001b[0m\u001b[0mmask\u001b[0m\u001b[1;33m]\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n\u001b[0;32m   5020\u001b[0m         \u001b[1;32mreturn\u001b[0m \u001b[0mself\u001b[0m\u001b[1;33m.\u001b[0m\u001b[0mdelete\u001b[0m\u001b[1;33m(\u001b[0m\u001b[0mindexer\u001b[0m\u001b[1;33m)\u001b[0m\u001b[1;33m\u001b[0m\u001b[1;33m\u001b[0m\u001b[0m\n",
+      "\u001b[1;31mKeyError\u001b[0m: \"['X_3' 'X_6' 'X_12'] not found in axis\""
+     ]
+    }
+   ],
+   "source": [
+    "# Dropping the collumns with very high correlation value\n",
+    "train.drop(['X_3','X_6','X_12'], axis = 1, inplace = True)\n",
+    "test.drop(['X_3','X_6','X_12'], axis = 1, inplace = True)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking the test data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "INCIDENT_ID    0\n",
+       "DATE           0\n",
+       "X_1            0\n",
+       "X_2            0\n",
+       "X_4            0\n",
+       "X_5            0\n",
+       "X_7            0\n",
+       "X_8            0\n",
+       "X_9            0\n",
+       "X_10           0\n",
+       "X_11           0\n",
+       "X_13           0\n",
+       "X_14           0\n",
+       "X_15           0\n",
+       "dtype: int64"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "test.isna().sum()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking the target variable"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "1    22788\n",
+       "0     1068\n",
+       "Name: MULTIPLE_OFFENSE, dtype: int64"
+      ]
+     },
+     "execution_count": 13,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "train['MULTIPLE_OFFENSE'].value_counts()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<Figure size 432x288 with 1 Axes>"
+      ]
+     },
+     "metadata": {
+      "needs_background": "light"
+     },
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "ax = sns.countplot(x=\"MULTIPLE_OFFENSE\",data=train)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The target variable is highly biased and may cause problems in predicting the values, hence we should apply techniques like stratified sampling, SMOTE etc. for proper sampling in the training data"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking if there is any duplicate column present in the data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "C:\\Anaconda3\\lib\\site-packages\\ipykernel_launcher.py:3: TqdmDeprecationWarning: This function will be removed in tqdm==5.0.0\n",
+      "Please use `tqdm.notebook.tqdm` instead of `tqdm.tqdm_notebook`\n",
+      "  This is separate from the ipykernel package so we can avoid doing imports until\n"
+     ]
+    },
+    {
+     "data": {
+      "application/vnd.jupyter.widget-view+json": {
+       "model_id": "b4411f2af5044e66829f7f7b9cf6edd6",
+       "version_major": 2,
+       "version_minor": 0
+      },
+      "text/plain": [
+       "HBox(children=(FloatProgress(value=0.0, max=15.0), HTML(value='')))"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "import tqdm\n",
+    "train_enc = pd.DataFrame(index = train.index)\n",
+    "for col in tqdm.tqdm_notebook(train.columns):\n",
+    "    train_enc[col] = train[col].factorize()[0]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "There are no duplicates in the given data"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking the skewness of the features given in the training set"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Index(['X_1', 'X_2', 'X_4', 'X_5', 'X_7', 'X_8', 'X_9', 'X_10', 'X_11', 'X_13',\n",
+       "       'X_14', 'X_15', 'MULTIPLE_OFFENSE'],\n",
+       "      dtype='object')"
+      ]
+     },
+     "execution_count": 16,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "feature_names = train.columns[2:]\n",
+    "feature_names"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "There are 4 numerical features with Skew > 0.5 :\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "X_10    34.940516\n",
+       "X_8     17.702736\n",
+       "X_1      3.789069\n",
+       "X_7      0.796118\n",
+       "X_14     0.245572\n",
+       "X_4      0.183382\n",
+       "X_5      0.175220\n",
+       "X_2     -0.094746\n",
+       "X_11    -0.903143\n",
+       "X_13    -1.388549\n",
+       "dtype: float64"
+      ]
+     },
+     "execution_count": 17,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "# Find skewed numerical features\n",
+    "skew_features = train[feature_names].apply(lambda x: skew(x)).sort_values(ascending=False)\n",
+    "\n",
+    "# Features with high skewness\n",
+    "high_skew = skew_features[skew_features > 0.5]\n",
+    "skew_index = high_skew.index\n",
+    "\n",
+    "print(\"There are {} numerical features with Skew > 0.5 :\".format(high_skew.shape[0]))\n",
+    "skewness = pd.DataFrame({'Skew' :high_skew})\n",
+    "skew_features.head(10)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Checking Outliers in the data"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "(array([   32,    47,    72, ..., 23825, 23849, 23855], dtype=int64), array([0, 7, 0, ..., 5, 0, 0], dtype=int64))\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Dropping ID and target columns\n",
+    "z_score_calc = train.drop(columns=['INCIDENT_ID', 'DATE','MULTIPLE_OFFENSE'])\n",
+    "# Calculating z score\n",
+    "z = np.abs(stats.zscore(z_score_calc))\n",
+    "# print(z)\n",
+    "threshold = 3\n",
+    "print(np.where(z > 4))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "treated_data = train[(z < 5).all(axis=1)]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "before treating outliers : (23856, 15)\n",
+      "after treating outliers : (23713, 15)\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"before treating outliers : {}\".format(train.shape))\n",
+    "print(\"after treating outliers : {}\".format(treated_data.shape))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Modelling"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 21,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Creating the variables for model fitting\n",
+    "X = treated_data.drop(columns=['INCIDENT_ID', 'DATE','MULTIPLE_OFFENSE'])\n",
+    "y = treated_data['MULTIPLE_OFFENSE']\n",
+    "\n",
+    "# Test variable\n",
+    "test = test.drop(columns=['DATE','INCIDENT_ID'])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 22,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import train_test_split\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X, y,test_size = .3, random_state=0)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: imblearn in c:\\anaconda3\\lib\\site-packages (0.0)\n",
+      "Requirement already satisfied: imbalanced-learn in c:\\anaconda3\\lib\\site-packages (from imblearn) (0.6.2)\n",
+      "Requirement already satisfied: scipy>=0.17 in c:\\anaconda3\\lib\\site-packages (from imbalanced-learn->imblearn) (1.4.1)\n",
+      "Requirement already satisfied: numpy>=1.11 in c:\\anaconda3\\lib\\site-packages (from imbalanced-learn->imblearn) (1.18.1)\n",
+      "Requirement already satisfied: joblib>=0.11 in c:\\anaconda3\\lib\\site-packages (from imbalanced-learn->imblearn) (0.14.1)\n",
+      "Requirement already satisfied: scikit-learn>=0.22 in c:\\anaconda3\\lib\\site-packages (from imbalanced-learn->imblearn) (0.22.1)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install imblearn"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Before OverSampling, counts of label '1': 15865\n",
+      "Before OverSampling, counts of label '0': 734 \n",
+      "\n",
+      "After OverSampling, the shape of train_X: (31730, 12)\n",
+      "After OverSampling, the shape of train_y: (31730,) \n",
+      "\n",
+      "After OverSampling, counts of label '1': 15865\n",
+      "After OverSampling, counts of label '0': 15865\n"
+     ]
+    }
+   ],
+   "source": [
+    "print(\"Before OverSampling, counts of label '1': {}\".format(sum(y_train == 1))) \n",
+    "print(\"Before OverSampling, counts of label '0': {} \\n\".format(sum(y_train == 0))) \n",
+    "  \n",
+    "# import SMOTE module from imblearn library \n",
+    "# pip install imblearn (if you don't have imblearn in your system) \n",
+    "from imblearn.over_sampling import SMOTE \n",
+    "sm = SMOTE(random_state = 2) \n",
+    "X_train_res, y_train_res = sm.fit_sample(X_train, y_train.ravel()) \n",
+    "  \n",
+    "print('After OverSampling, the shape of train_X: {}'.format(X_train_res.shape)) \n",
+    "print('After OverSampling, the shape of train_y: {} \\n'.format(y_train_res.shape)) \n",
+    "  \n",
+    "print(\"After OverSampling, counts of label '1': {}\".format(sum(y_train_res == 1))) \n",
+    "print(\"After OverSampling, counts of label '0': {}\".format(sum(y_train_res == 0)))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 25,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9953612594883329"
+      ]
+     },
+     "execution_count": 25,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "## Import the random forest model.\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "## This line instantiates the model. \n",
+    "rf = RandomForestClassifier() \n",
+    "## Fit the model on your training data.\n",
+    "rf.fit(X_train, y_train) \n",
+    "## And score it on your testing data.\n",
+    "rf.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 26,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9940961484396964"
+      ]
+     },
+     "execution_count": 26,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "## This line instantiates the model. \n",
+    "rf2 = RandomForestClassifier() \n",
+    "## Fit the model on your training data.\n",
+    "rf2.fit(X_train_res, y_train_res) \n",
+    "## And score it on your testing data.\n",
+    "rf2.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_rf = rf.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_rf2 = rf2.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_rf})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_rf.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_rf2})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_rf2.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: lightgbm in c:\\anaconda3\\lib\\site-packages (2.3.1)\n",
+      "Requirement already satisfied: scikit-learn in c:\\anaconda3\\lib\\site-packages (from lightgbm) (0.22.1)\n",
+      "Requirement already satisfied: numpy in c:\\anaconda3\\lib\\site-packages (from lightgbm) (1.18.1)\n",
+      "Requirement already satisfied: scipy in c:\\anaconda3\\lib\\site-packages (from lightgbm) (1.4.1)\n",
+      "Requirement already satisfied: joblib>=0.11 in c:\\anaconda3\\lib\\site-packages (from scikit-learn->lightgbm) (0.14.1)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install lightgbm"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9981726173741917"
+      ]
+     },
+     "execution_count": 32,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import lightgbm as lgb\n",
+    "lgbc = lgb.LGBMClassifier(learning_rate = 0.125, metric = 'l1', \n",
+    "                        n_estimators = 20, num_leaves = 38)\n",
+    "lgbc.fit(X_train, y_train) \n",
+    "lgbc.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9966263705369693"
+      ]
+     },
+     "execution_count": 33,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "lgbc2 = lgb.LGBMClassifier(learning_rate = 0.125, metric = 'l1', \n",
+    "                        n_estimators = 20, num_leaves = 38)\n",
+    "lgbc2.fit(X_train_res, y_train_res) \n",
+    "lgbc2.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_lgb = lgbc.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_lgbc2 = lgbc2.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_lgb})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_lgb.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_lgbc2})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_lgb2.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Requirement already satisfied: xgboost in c:\\anaconda3\\lib\\site-packages (1.1.0)\n",
+      "Requirement already satisfied: scipy in c:\\anaconda3\\lib\\site-packages (from xgboost) (1.4.1)\n",
+      "Requirement already satisfied: numpy in c:\\anaconda3\\lib\\site-packages (from xgboost) (1.18.1)\n"
+     ]
+    }
+   ],
+   "source": [
+    "!pip install xgboost"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9997188642114141"
+      ]
+     },
+     "execution_count": 39,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "import xgboost as xgb\n",
+    "xgbc = xgb.XGBClassifier()\n",
+    "xgbc.fit(X_train, y_train) \n",
+    "xgbc.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_xgb = xgbc.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.9987348889513635"
+      ]
+     },
+     "execution_count": 41,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "xgbc2 = xgb.XGBClassifier()\n",
+    "xgbc2.fit(X_train_res, y_train_res) \n",
+    "xgbc2.score(X_test, y_test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 42,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "prediction_xgb2 = xgbc2.predict(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 43,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_xgb})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_xgb.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 44,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_xgb2})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_xgb2.csv',index=False)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 77,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Blend models in order to make the final predictions more robust to overfitting\n",
+    "def blended_predictions(X):\n",
+    "    return (((0.1 * rf.predict(X)) + \\\n",
+    "            (0.1 * lgbc.predict(X)) + \\\n",
+    "            (0.15 * lgbc2.predict(X)) + \\\n",
+    "            (0.2 * xgbc.predict(X)) + \\\n",
+    "            (0.35 * xgbc2.predict((X)))))"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 78,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "final_predictions  = blended_predictions(test)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 79,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "array([0.9, 0.9, 0.9, ..., 0.9, 0.9, 0.9])"
+      ]
+     },
+     "execution_count": 79,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "final_predictions"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Filling the prediction values agains the Incident'id's of the test data \n",
+    "# to create final submission file\n",
+    "test_orig = pd.read_csv(\"test.csv\")\n",
+    "submission=pd.DataFrame({\"INCIDENT_ID\":test_orig['INCIDENT_ID'],\n",
+    "                         \"MULTIPLE_OFFENSE\":prediction_xgb2})\n",
+    "\n",
+    "# Writing the submission dataframe to a csv file to submit\n",
+    "submission.to_csv('submission_xgb2.csv',index=False)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.7.6"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}
